@@ -89,20 +89,40 @@ def bandwidth_efficiency_per_person(df):
     
     # Filter for specific people and clean up names
     allowed_people = ['gagan', 'ganesh', 'akshay']
-    df_copy.loc[:, 'Assignee'] = df_copy['Assignee'].fillna('').str.replace('@urbanpiper.com', '', regex=False)
+    
+    # Clean and standardize assignee names
+    def clean_name(name):
+        name = str(name).lower()
+        name = name.replace('@urbanpiper.com', '')
+        # Remove any common prefixes/suffixes and whitespace
+        name = name.strip()
+        return name
+    
+    df_copy.loc[:, 'Assignee'] = df_copy['Assignee'].fillna('').apply(clean_name)
     df_filtered = df_copy[df_copy['Assignee'].apply(lambda x: any(person in x for person in allowed_people))]
     
     # Calculate actual efficiency in person weeks per person
     df_filtered.loc[:, 'Estimate'] = pd.to_numeric(df_filtered['Estimate'], errors='coerce').fillna(0)
     person_efficiency = df_filtered.groupby('Assignee')['Estimate'].sum() / 5  # 1 person week = 5 story points
     
-    # Predicted efficiency (available bandwidth per person)
-    predicted_efficiency_per_person = 12  # Assuming 12 person weeks available per person
+    # Define available weeks per person with standardized names
+    available_weeks = {
+        'ganesh': 4,  # Ganesh was only available for 4 weeks
+        'gagan': 12,  # Full quarter availability
+        'akshay': 12  # Full quarter availability
+    }
     
-    # Create a DataFrame for visualization
+    # Create a DataFrame for visualization with proper name matching
+    predicted_weeks = []
+    for person in person_efficiency.index:
+        clean_person = clean_name(person)
+        # Find the matching name in available_weeks
+        matched_person = next((k for k in available_weeks.keys() if k in clean_person), None)
+        predicted_weeks.append(available_weeks.get(matched_person, 12))
+    
     efficiency_data = pd.DataFrame({
         'Person': person_efficiency.index,
-        'Predicted Efficiency (Person Weeks)': [predicted_efficiency_per_person] * len(person_efficiency),
+        'Predicted Efficiency (Person Weeks)': predicted_weeks,
         'Actual Efficiency (Person Weeks)': person_efficiency.values
     })
     
